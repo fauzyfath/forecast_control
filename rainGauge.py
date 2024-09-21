@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 
 # Constants
-PIN_INTERRUPT = 2  # GPIO pin number (BCM numbering)
+PIN_INTERRUPT = 25  # GPIO pin number (BCM numbering)
 MILLIMETER_PER_TIP = 0.70
 UPDATE_INTERVAL = 10  # Seconds
 
@@ -47,13 +47,13 @@ def print_serial(hours, minutes, seconds):
     menit = str(minutes).zfill(2)
     detik = str(seconds).zfill(2)
 
-    print(f"{jam}:{menit}:{detik}")
-    print(f"Cuaca={cuaca}")
-    print(f"Jumlah tip={jumlah_tip} kali")
-    print(f"Curah hujan hari ini={curah_hujan_hari_ini:.1f} mm")
-    print(f"Curah hujan per menit={curah_hujan_per_menit:.1f} mm")
-    print(f"Curah hujan per jam={curah_hujan_per_jam:.1f} mm")
-    print(f"Curah hujan per hari={curah_hujan_per_hari:.1f} mm")
+    # print(f"{jam}:{menit}:{detik}")
+    # print(f"Cuaca={cuaca}")
+    # print(f"Jumlah tip={jumlah_tip} kali")
+    # print(f"Curah hujan hari ini={curah_hujan_hari_ini:.1f} mm")
+    # print(f"Curah hujan per menit={curah_hujan_per_menit:.1f} mm")
+    # print(f"Curah hujan per jam={curah_hujan_per_jam:.1f} mm")
+    # print(f"Curah hujan per hari={curah_hujan_per_hari:.1f} mm")
 
 def run_rain_gauge():
     global last_update

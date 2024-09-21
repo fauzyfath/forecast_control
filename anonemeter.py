@@ -14,7 +14,7 @@ rotasi_per_detik = 0.0
 kecepatan_meter_per_detik = 0.0
 kecepatan_kilometer_per_jam = 0.0
 
-def rpm_anemometer(channel):
+def rpm_anemometer(channel): 
     global rpmcount, last_micros
     current_micros = time.time() * 1_000_000
     if (current_micros - last_micros) >= 5000:  # 5 milliseconds
