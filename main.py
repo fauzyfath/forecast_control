@@ -6,39 +6,32 @@ from rainGauge import run_rain_gauge, get_rainfall_data
 from anonemeter import run_anonemeter, get_wind_data
 from ultrasonic import run_ultrasonic, get_distance_data
 from BH1750 import run_bh1750, get_light_data
+from camera import capture_image
 
 # Konfigurasi port serial dan kecepatan baudrate
 PORT = '/dev/tty7'  # Ganti dengan port yang sesuai
 BAUD_RATE = 9600
 
-def send_message():
+def send_message(data):
     with serial.Serial(PORT, BAUD_RATE, timeout=1) as ser:
         time.sleep(2)  # Tunggu sampai port terbuka
         ser.write(data.encode())
         print(f"Data dikirim: {data}")
 
+def run_zigbee_receiver(port='/dev/ttyUSB0', baud_rate=9600):
+    # Receive messages from the Zigbee module and trigger camera capture on 'activate'.
+    with serial.Serial(port, baud_rate, timeout=1) as ser:
+        print("Zigbee receiver started. Waiting for messages...")
+        while True:
+            if ser.in_waiting > 0:
+                # Read the incoming message
+                message = ser.readline().decode('utf-8').strip()
+                print(f"Received message: {message}")
+                
+                # Check if the action is "activate"
+                if message.lower() == "activate":
+                    capture_image('/images')  # Adjust the directory as needed
 
-def show_data_collection():
-    # Fetch and display the latest rainfall data
-    rainData = get_rainfall_data()
-    # print("Current Rainfall Data:")
-    print(rainData)
-    
-    # Fetch and display the latest wind data
-    windData = get_wind_data()
-    # print("Current wind Data:")
-    print(windData)
-
-    # Fetch and display the latest distance data
-    # distanceData = get_distance_data()
-    # print("Current distance Data:")
-    # print(distanceData)
-    
-    # Fetch and display the latest light data
-    lightData = get_light_data()
-    # print("current light Data:")
-    print(lightData)
-    
 def run_rain_gauge_thread():
     # Run the rain gauge in a separate thread
     run_rain_gauge()
@@ -68,9 +61,20 @@ if __name__ == "__main__":
         ultrasonic_thread.start()
 
         while True:
-            # Optionally display the data to the console
-            show_data_collection()
+            # all sensor data 
+            rainData = get_rainfall_data()
+            windData = get_wind_data()
+            distanceData = get_distance_data()
+            lightData = get_light_data()
+
+            # Combine all data into one variable (string)
+            current_data = f"Rainfall:{rainData}, Wind:{windData}, Distance:{distanceData}, Light:{lightData}"
             
+            print("Current Data:")
+            print(current_data)
+            
+            send_message(current_data)
+
             time.sleep(10)  # Adjust sleep time as needed
 
     except KeyboardInterrupt:
