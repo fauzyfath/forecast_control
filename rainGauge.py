@@ -26,7 +26,7 @@ flag = False
 def hitung_curah_hujan(channel):
     global flag
     flag = True
-    print("Interrupt detected!")  # Debugging line
+    # print("Interrupt detected!")  # Debugging line
 
 def get_system_time():
     now = datetime.now()
@@ -85,7 +85,7 @@ def run_rain_gauge():
                 curah_hujan += MILLIMETER_PER_TIP
                 jumlah_tip += 1
                 flag = False
-                print(f"Tip detected! Total tips: {jumlah_tip}")  # Debugging line
+                # print(f"Tip detected! Total tips: {jumlah_tip}")  # Debugging line
             
             hours, minutes, seconds = get_system_time()
             

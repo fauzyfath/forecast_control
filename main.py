@@ -69,11 +69,19 @@ if __name__ == "__main__":
 
             # Combine all data into one variable (string)
             current_data = f"Rainfall:{rainData}, Wind:{windData}, Distance:{distanceData}, Light:{lightData}"
+
+            # Get the current time in seconds since the epoch
+            current_time = time.time()
             
-            print("Current Data:")
+            # Convert it to a readable format
+            local_time = time.localtime(current_time)
+            formatted_time = time.strftime("%H:%M:%S", local_time)
+            
+            # Print the current time
+            print("Current time:", formatted_time)
             print(current_data)
             
-            send_message(current_data)
+            # send_message(current_data)
 
             time.sleep(10)  # Adjust sleep time as needed
 
