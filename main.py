@@ -1,74 +1,139 @@
-# main.py
 import time
 import threading
-import serial 
+import serial
 from rainGauge import run_rain_gauge, get_rainfall_data
 from anonemeter import run_anonemeter, get_wind_data
 from ultrasonic import run_ultrasonic, get_distance_data
 from BH1750 import run_bh1750, get_light_data
-from camera import capture_image
+from camera import capture_image  
+from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress, XBeeNetwork
+from threading import Lock
 
-# Konfigurasi port serial dan kecepatan baudrate
-PORT = '/dev/tty7'  # Ganti dengan port yang sesuai
-BAUD_RATE = 9600
+# Configure your local XBee
+PORT = "/dev/ttyUSB0"  # Update with your correct port
+BAUD_RATE = 9600       # Baud rate for XBee communication
+REMOTE_XBEE_ADDRESS = "0013A2004213D0CD"  # Replace with your remote XBee's 64-bit address
 
-def send_message(data):
-    with serial.Serial(PORT, BAUD_RATE, timeout=1) as ser:
-        time.sleep(2)  # Tunggu sampai port terbuka
-        ser.write(data.encode())
-        print(f"Data dikirim: {data}")
+# Initialize local XBee device
+device = XBeeDevice(PORT, BAUD_RATE)
+device_lock = Lock()  # Lock for thread-safe device communication
 
-def run_zigbee_receiver(port='/dev/ttyUSB0', baud_rate=9600):
-    # Receive messages from the Zigbee module and trigger camera capture on 'activate'.
-    with serial.Serial(port, baud_rate, timeout=1) as ser:
-        print("Zigbee receiver started. Waiting for messages...")
+def send_message_to_remote(data, current_time):
+    message = f"time: {current_time} data: {data}"
+    try:
+        with device_lock:
+            if not device.is_open():
+                device.open()
+
+            # Create a Remote XBee object (specify the 64-bit address of the target XBee)
+            remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(REMOTE_XBEE_ADDRESS))
+            
+            # Send the message to the remote XBee
+            time.sleep(2)
+            device.send_data(remote_device, message)
+            print(f"Data sent: {message}")
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+def receive_message():
+    try:
+        with device_lock:
+            if not device.is_open():
+                device.open()
+
         while True:
-            if ser.in_waiting > 0:
-                # Read the incoming message
-                message = ser.readline().decode('utf-8').strip()
-                print(f"Received message: {message}")
-                
+            # Wait for incoming data
+            xbee_message = device.read_data()
+            if xbee_message:
+                received_data = xbee_message.data.decode("utf-8")
+                print(f"Message received: {received_data}")
+
+                # You can also print the sender's 64-bit address if needed
+                sender_address = xbee_message.remote_device.get_64bit_addr()
+                print(f"Message from: {sender_address}")
+
                 # Check if the action is "activate"
-                if message.lower() == "activate":
-                    capture_image('/images')  # Adjust the directory as needed
+                if received_data.lower() == "activate":
+                    print("Activation command received. Capturing image...")
+                    image_path = capture_image()  # Capture image and get the image path
+                    
+                    # Send the image path via Zigbee
+                    send_image_path(image_path)
+
+    except Exception as e:
+        print(f"Error: {e}")
+
+def send_image_path(image_path):
+    path = image_path
+    try:
+        with device_lock:
+            if not device.is_open():
+                device.open()
+
+            # Create a Remote XBee object (specify the 64-bit address of the target XBee)
+            remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(REMOTE_XBEE_ADDRESS))
+            
+            # Send the message to the remote XBee
+            time.sleep(2)
+            device.send_data(remote_device, path)
+            print(f"Image path sent: {path}")
+
+    except Exception as e:
+        print(f"Error: {e}")
 
 def run_rain_gauge_thread():
-    # Run the rain gauge in a separate thread
-    run_rain_gauge()
+    try:
+        run_rain_gauge()
+    except Exception as e:
+        print(f"Error in rain gauge thread: {e}")
 
-def run_anonemeter_thread():
-    # Run the anonemeter in seperate thread
-    run_anonemeter()
+def run_anemometer_thread():
+    try:
+        run_anonemeter()
+    except Exception as e:
+        print(f"Error in anemometer thread: {e}")
 
 def run_ultrasonic_thread():
-    # Run the ultrasonic in seperate thread 
-    run_ultrasonic()
+    try:
+        run_ultrasonic()
+    except Exception as e:
+        print(f"Error in ultrasonic thread: {e}")
 
 def run_bh1750_thread():
-    # Run the lightsensor in seperate thread
-    run_bh1750()
+    try:
+        run_bh1750()
+    except Exception as e:
+        print(f"Error in BH1750 thread: {e}")
 
 if __name__ == "__main__":
     try:
-        # Start the all sensors in a separate thread
+        # Start all sensors in separate threads
         gauge_thread = threading.Thread(target=run_rain_gauge_thread, daemon=True)
         gauge_thread.start()
-        anonemeter_thread = threading.Thread(target=run_anonemeter_thread, daemon=True)
-        anonemeter_thread.start()
+
+        anemometer_thread = threading.Thread(target=run_anemometer_thread, daemon=True)
+        anemometer_thread.start()
+
         bh1750_thread = threading.Thread(target=run_bh1750_thread, daemon=True)
         bh1750_thread.start()
+
         ultrasonic_thread = threading.Thread(target=run_ultrasonic_thread, daemon=True)
         ultrasonic_thread.start()
 
+        # Start Zigbee receiver in a separate thread
+        zigbee_thread = threading.Thread(target=receive_message, daemon=True)
+        zigbee_thread.start()
+
         while True:
-            # all sensor data 
-            rainData = get_rainfall_data()
-            windData = get_wind_data()
-            distanceData = get_distance_data()
-            lightData = get_light_data()
+            # Get data from all sensors
+            rain_data = get_rainfall_data()
+            wind_data = get_wind_data()
+            distance_data = get_distance_data()
+            light_data = get_light_data()
 
             # Combine all data into one variable (string)
-            current_data = f"Rainfall:{rainData}, Wind:{windData}, Distance:{distanceData}, Light:{lightData}"
+            current_data = f"Rainfall:{rain_data}, Wind:{wind_data}, Distance:{distance_data}, Light:{light_data}"
 
             # Get the current time in seconds since the epoch
             current_time = time.time()
@@ -77,15 +142,19 @@ if __name__ == "__main__":
             local_time = time.localtime(current_time)
             formatted_time = time.strftime("%H:%M:%S", local_time)
             
-            # Print the current time
-            print("Current time:", formatted_time)
+            # Print the current time and data
+            print(f"Current time: {formatted_time}")
             print(current_data)
             
-            # send_message(current_data)
-
+            # Send data via serial
+            send_message_to_remote(current_data, formatted_time)
+            
             time.sleep(10)  # Adjust sleep time as needed
 
     except KeyboardInterrupt:
         print('System stopped by user.')
-    finally:\
+    finally:
+        with device_lock:
+            if device.is_open():
+                device.close()
         print('Cleaning up resources.')

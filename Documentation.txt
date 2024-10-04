@@ -1,0 +1,1 @@
+sudo /home/admin/Desktop/forecast_control/myenv/bin/python /home/admin/Desktop/forecast_control/main.py
