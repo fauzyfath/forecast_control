@@ -1,25 +1,19 @@
-import time
 import serial
+import time
 from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress, XBeeNetwork
 
-# Configure your local XBee
-PORT = "/dev/ttyUSB0"  # Update with your correct port
-BAUD_RATE = 9600       # Baud rate for XBee communication
+port = "/dev/ttyUSB0"
+Baud_rate = 9600
 
-# Define the address of the remote XBee
-REMOTE_XBEE_ADDRESS = "0013A2004213D0CD"  # Replace with your remote XBee's 64-bit address
+remote_xbee_address = "0013A2004213D0CD"
 
-# Initialize local XBee device
-device = XBeeDevice(PORT, BAUD_RATE)
+device = XBeeDevice(port, Baud_rate)
 
 def send_message_to_remote(data):
     try:
         device.open()
 
-        # Create a Remote XBee object (specify the 64-bit address of the target XBee)
-        remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(REMOTE_XBEE_ADDRESS))
-
-        # Send the message to the remote XBee
+        remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(remote_xbee_address))
         device.send_data(remote_device, data)
         print(f"Message sent: {data}")
 
@@ -34,14 +28,13 @@ def receive_message():
         device.open()
 
         print("Waiting for data from remote XBee...")
+
         while True:
-            # Wait for incoming data
             xbee_message = device.read_data()
             if xbee_message:
                 received_data = xbee_message.data.decode("utf-8")
                 print(f"Message received: {received_data}")
 
-                # You can also print the sender's 64-bit address if needed
                 sender_address = xbee_message.remote_device.get_64bit_addr()
                 print(f"Message from: {sender_address}")
 
@@ -53,16 +46,20 @@ def receive_message():
 
 if __name__ == "__main__":
     try:
-        # Example: Sending data
-        message_to_send = "Hello from local XBee!"
-        send_message_to_remote(message_to_send)
+        # Start the message sending loop
+        while True:
+            message_to_send = input("Enter message to send (or 'exit' to quit): ")
+            if message_to_send.lower() == 'exit':
+                print("Exiting message sending loop.")
+                break
+            send_message_to_remote(message_to_send)
 
-        # Example: Receiving data (continuously listens for incoming messages)
+        # Start receiving messages
         receive_message()
 
     except KeyboardInterrupt:
         print("Program interrupted by user.")
-
+    
     finally:
         if device.is_open():
             device.close()

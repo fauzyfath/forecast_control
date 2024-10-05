@@ -1,12 +1,11 @@
 import time
 import threading
-import serial
 from rainGauge import run_rain_gauge, get_rainfall_data
 from anonemeter import run_anonemeter, get_wind_data
 from ultrasonic import run_ultrasonic, get_distance_data
 from BH1750 import run_bh1750, get_light_data
-from camera import capture_image  
-from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress, XBeeNetwork
+from camera import capture_image
+from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress
 from threading import Lock
 
 # Configure your local XBee
@@ -18,6 +17,7 @@ REMOTE_XBEE_ADDRESS = "0013A2004213D0CD"  # Replace with your remote XBee's 64-b
 device = XBeeDevice(PORT, BAUD_RATE)
 device_lock = Lock()  # Lock for thread-safe device communication
 
+# Function to send a message to the remote XBee
 def send_message_to_remote(data, current_time):
     message = f"time: {current_time} data: {data}"
     try:
@@ -36,6 +36,7 @@ def send_message_to_remote(data, current_time):
     except Exception as e:
         print(f"Error: {e}")
 
+# Function to receive messages from the remote XBee
 def receive_message():
     try:
         with device_lock:
@@ -64,6 +65,7 @@ def receive_message():
     except Exception as e:
         print(f"Error: {e}")
 
+# Function to send the image path after capturing
 def send_image_path(image_path):
     path = image_path
     try:
@@ -74,7 +76,7 @@ def send_image_path(image_path):
             # Create a Remote XBee object (specify the 64-bit address of the target XBee)
             remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(REMOTE_XBEE_ADDRESS))
             
-            # Send the message to the remote XBee
+            # Send the image path to the remote XBee
             time.sleep(2)
             device.send_data(remote_device, path)
             print(f"Image path sent: {path}")
@@ -82,30 +84,35 @@ def send_image_path(image_path):
     except Exception as e:
         print(f"Error: {e}")
 
+# Function to run the rain gauge thread
 def run_rain_gauge_thread():
     try:
         run_rain_gauge()
     except Exception as e:
         print(f"Error in rain gauge thread: {e}")
 
+# Function to run the anemometer thread
 def run_anemometer_thread():
     try:
         run_anonemeter()
     except Exception as e:
         print(f"Error in anemometer thread: {e}")
 
+# Function to run the ultrasonic sensor thread
 def run_ultrasonic_thread():
     try:
         run_ultrasonic()
     except Exception as e:
         print(f"Error in ultrasonic thread: {e}")
 
+# Function to run the BH1750 light sensor thread
 def run_bh1750_thread():
     try:
         run_bh1750()
     except Exception as e:
         print(f"Error in BH1750 thread: {e}")
 
+# Main function to handle sensor data collection and communication
 if __name__ == "__main__":
     try:
         # Start all sensors in separate threads
@@ -125,6 +132,7 @@ if __name__ == "__main__":
         zigbee_thread = threading.Thread(target=receive_message, daemon=True)
         zigbee_thread.start()
 
+        # Main loop to collect sensor data and send messages
         while True:
             # Get data from all sensors
             rain_data = get_rainfall_data()
@@ -146,7 +154,7 @@ if __name__ == "__main__":
             print(f"Current time: {formatted_time}")
             print(current_data)
             
-            # Send data via serial
+            # Send data via Zigbee
             send_message_to_remote(current_data, formatted_time)
             
             time.sleep(10)  # Adjust sleep time as needed
