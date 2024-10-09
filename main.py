@@ -4,7 +4,7 @@ from rainGauge import run_rain_gauge, get_rainfall_data
 from anonemeter import run_anonemeter, get_wind_data
 from ultrasonic import run_ultrasonic, get_distance_data
 from BH1750 import run_bh1750, get_light_data
-from camera import capture_image
+from receive_msg import receive_message, send_image_path
 from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress
 from threading import Lock
 
@@ -19,118 +19,76 @@ device_lock = Lock()  # Lock for thread-safe device communication
 
 # Function to send a message to the remote XBee
 def send_message_to_remote(data, current_time):
-    message = f"time: {current_time} data: {data}"
     try:
         with device_lock:
             if not device.is_open():
                 device.open()
 
-            # Create a Remote XBee object (specify the 64-bit address of the target XBee)
             remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(REMOTE_XBEE_ADDRESS))
-            
+            msg = f"{current_time},{data}"
             # Send the message to the remote XBee
             time.sleep(2)
-            device.send_data(remote_device, message)
-            print(f"Data sent: {message}")
+            device.send_data(remote_device, msg)
+            print(f"Data sent: {msg}")
 
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"Error sending Zigbee message: {e}")
+    
+# Function to format and compress the sensor data
+def format_data(rain_data, wind_data, distance_data, light_data):
+    # Use abbreviations for weather and add light descriptions
+    rain_weather_map = {
+        "Berawan": "(B)",
+        "Hujan Ringan": "(HR)",
+        "Hujan Sedang": "(HS)",
+        "Hujan Lebat": "(HL)",
+        "Hujan Extreme": "(HE)",
+    }
+    light_weather_map = {
+        "Mendung": "(M)",
+        "Cerah": "(C)",
+        "Malam/Hujan": "(M/H)",
+        "Error reading light level": "(ER)",
+    }   
+    
+    # Rain data
+    rain_condition = rain_weather_map.get(rain_data['cuaca'], "N/A")  # Default to N/A if not found
+    rain = f"{rain_data['jumlah_tip']},{rain_data['curah_hujan_per_menit']:.1f},{rain_data['curah_hujan_per_jam']:.1f},{rain_data['curah_hujan_per_hari']:.1f},{rain_data['curah_hujan_hari_ini']:.1f},{rain_condition}"
+    
+    # Wind data
+    wind = f"{wind_data['rotasi_per_detik']:.1f},{wind_data['kecepatan_meter_per_detik']:.1f},{wind_data['kecepatan_kilometer_per_jam']:.1f}"
+    
+    # Distance data
+    distance = f"{distance_data['distance']}"
+    
+    # Light data
+    if light_data and 'cahaya cuaca' in light_data:
+        light_info = light_data['cahaya cuaca']  # e.g., "Mendung(20.83 lux)"
+        light_value = light_info.split("(")[1].replace(" lux)", "")  # Extract the lux value
+        light_condition = light_info.split("(")[0]  # Extract the condition description
+        light_abbreviation = light_weather_map.get(light_condition, "N/A")  # Get abbreviation for light condition
+    else:
+        # If no light data or lux is 0, assume it's "Malam/Hujan"
+        light_value = "0"
+        light_abbreviation = "(M/H)"
 
-# Function to receive messages from the remote XBee
-def receive_message():
-    try:
-        with device_lock:
-            if not device.is_open():
-                device.open()
+    light_description = f"L:{light_value},{light_abbreviation}"
 
-        while True:
-            # Wait for incoming data
-            xbee_message = device.read_data()
-            if xbee_message:
-                received_data = xbee_message.data.decode("utf-8")
-                print(f"Message received: {received_data}")
-
-                # You can also print the sender's 64-bit address if needed
-                sender_address = xbee_message.remote_device.get_64bit_addr()
-                print(f"Message from: {sender_address}")
-
-                # Check if the action is "activate"
-                if received_data.lower() == "activate":
-                    print("Activation command received. Capturing image...")
-                    image_path = capture_image()  # Capture image and get the image path
-                    
-                    # Send the image path via Zigbee
-                    send_image_path(image_path)
-
-    except Exception as e:
-        print(f"Error: {e}")
-
-# Function to send the image path after capturing
-def send_image_path(image_path):
-    path = image_path
-    try:
-        with device_lock:
-            if not device.is_open():
-                device.open()
-
-            # Create a Remote XBee object (specify the 64-bit address of the target XBee)
-            remote_device = RemoteXBeeDevice(device, XBee64BitAddress.from_hex_string(REMOTE_XBEE_ADDRESS))
-            
-            # Send the image path to the remote XBee
-            time.sleep(2)
-            device.send_data(remote_device, path)
-            print(f"Image path sent: {path}")
-
-    except Exception as e:
-        print(f"Error: {e}")
-
-# Function to run the rain gauge thread
-def run_rain_gauge_thread():
-    try:
-        run_rain_gauge()
-    except Exception as e:
-        print(f"Error in rain gauge thread: {e}")
-
-# Function to run the anemometer thread
-def run_anemometer_thread():
-    try:
-        run_anonemeter()
-    except Exception as e:
-        print(f"Error in anemometer thread: {e}")
-
-# Function to run the ultrasonic sensor thread
-def run_ultrasonic_thread():
-    try:
-        run_ultrasonic()
-    except Exception as e:
-        print(f"Error in ultrasonic thread: {e}")
-
-# Function to run the BH1750 light sensor thread
-def run_bh1750_thread():
-    try:
-        run_bh1750()
-    except Exception as e:
-        print(f"Error in BH1750 thread: {e}")
+    # Concatenate all the data
+    return f"R:{rain}|W:{wind}|D:{distance}|{light_description}"
 
 # Main function to handle sensor data collection and communication
 if __name__ == "__main__":
     try:
         # Start all sensors in separate threads
-        gauge_thread = threading.Thread(target=run_rain_gauge_thread, daemon=True)
-        gauge_thread.start()
-
-        anemometer_thread = threading.Thread(target=run_anemometer_thread, daemon=True)
-        anemometer_thread.start()
-
-        bh1750_thread = threading.Thread(target=run_bh1750_thread, daemon=True)
-        bh1750_thread.start()
-
-        ultrasonic_thread = threading.Thread(target=run_ultrasonic_thread, daemon=True)
-        ultrasonic_thread.start()
+        threading.Thread(target=run_rain_gauge, daemon=True).start()
+        threading.Thread(target=run_anonemeter, daemon=True).start()
+        threading.Thread(target=run_bh1750, daemon=True).start()
+        threading.Thread(target=run_ultrasonic, daemon=True).start()
 
         # Start Zigbee receiver in a separate thread
-        zigbee_thread = threading.Thread(target=receive_message, daemon=True)
-        zigbee_thread.start()
+        threading.Thread(target=receive_message, daemon=True).start()
+
 
         # Main loop to collect sensor data and send messages
         while True:
@@ -140,23 +98,19 @@ if __name__ == "__main__":
             distance_data = get_distance_data()
             light_data = get_light_data()
 
-            # Combine all data into one variable (string)
-            current_data = f"Rainfall:{rain_data}, Wind:{wind_data}, Distance:{distance_data}, Light:{light_data}"
+            # Format the data to reduce size
+            current_data = format_data(rain_data, wind_data, distance_data, light_data)
 
             # Get the current time in seconds since the epoch
-            current_time = time.time()
-            
-            # Convert it to a readable format
-            local_time = time.localtime(current_time)
-            formatted_time = time.strftime("%H:%M:%S", local_time)
-            
+            current_time = time.strftime("%H:%M:%S", time.localtime())
+
             # Print the current time and data
-            print(f"Current time: {formatted_time}")
-            print(current_data)
-            
+            print(f"Current time: {current_time}")
+            print(f"Formatted data: {current_data}")
+
             # Send data via Zigbee
-            send_message_to_remote(current_data, formatted_time)
-            
+            send_message_to_remote(current_data, current_time)
+
             time.sleep(10)  # Adjust sleep time as needed
 
     except KeyboardInterrupt:

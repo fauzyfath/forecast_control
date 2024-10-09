@@ -33,11 +33,11 @@ def run_bh1750():
     try:
         while True:
             lux = read_light(bus)
-            if lux > 1 and lux < 50:
+            if lux > 10 and lux < 50:
                 lux_output = f"Mendung({lux:.2f} lux)"
             elif lux > 50:
                 lux_output = f"Cerah({lux:.2f} lux)"
-            elif lux <= 1:
+            elif lux <= 10:
                 lux_output = f"Malam/Hujan({lux:.2f} lux)"
             else:
                 lux_output = "Error reading light level"

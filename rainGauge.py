@@ -4,7 +4,7 @@ import time
 from datetime import datetime
 
 # Constants
-PIN_INTERRUPT = 25  # GPIO pin number (BCM numbering)
+PIN_INTERRUPT = 16  # GPIO pin number (BCM numbering)
 MILLIMETER_PER_TIP = 0.70
 UPDATE_INTERVAL = 10  # Seconds
 
@@ -26,7 +26,7 @@ flag = False
 def hitung_curah_hujan(channel):
     global flag
     flag = True
-    # print("Interrupt detected!")  # Debugging line
+    print("Interrupt detected!")  # Debugging line
 
 def get_system_time():
     now = datetime.now()
