@@ -4,7 +4,7 @@ from rainGauge import run_rain_gauge, get_rainfall_data
 from anonemeter import run_anonemeter, get_wind_data
 from ultrasonic import run_ultrasonic, get_distance_data
 from BH1750 import run_bh1750, get_light_data
-from receive_msg import receive_message, send_image_path
+from receive_msg import receive_message
 from digi.xbee.devices import XBeeDevice, RemoteXBeeDevice, XBee64BitAddress
 from threading import Lock
 
@@ -87,8 +87,7 @@ if __name__ == "__main__":
         threading.Thread(target=run_ultrasonic, daemon=True).start()
 
         # Start Zigbee receiver in a separate thread
-        threading.Thread(target=receive_message, daemon=True).start()
-
+        # threading.Thread(target=receive_message, daemon=True).start()
 
         # Main loop to collect sensor data and send messages
         while True:

@@ -1,58 +1,64 @@
+from gpiozero import DistanceSensor, Device
+from gpiozero.pins.pigpio import PiGPIOFactory
+from time import sleep
 import RPi.GPIO as GPIO
-from time import sleep, time
+import warnings
 
-# Set up GPIO mode
-GPIO.setmode(GPIO.BCM)
+# Suppress specific warnings related to no echo
+warnings.filterwarnings("ignore", category=UserWarning, module='gpiozero.input_devices')
 
-# Set up the ultrasonic sensor pins
-TRIG = 23  # GPIO pin connected to Trigger pin of the sensor
-ECHO = 24  # GPIO pin connected to Echo pin of the sensor
+# Use the pigpio library for accurate timing
+factory = PiGPIOFactory()
 
-# Set up GPIO pins as input/output
-GPIO.setup(TRIG, GPIO.OUT)
-GPIO.setup(ECHO, GPIO.IN)
+# Initialize DistanceSensor with retries and a timeout to handle "no echo" warnings gracefully
+sensor = DistanceSensor(
+    echo=23, 
+    trigger=24, 
+    max_distance=4,  # Maximum range of the sensor (in meters)
+    threshold_distance=0.05,  # Optional: Trigger when distance falls below this value
+    pin_factory=factory
+)
 
-distance = 0  # Variable to store distance
+# Global variable to store the distance data
+distance = 0.0
 
-# Function to get distance from ultrasonic sensor
+# Function to get the distance data
 def get_distance_data():
     global distance
-    return {
-        "distance": distance
-    }
+    return {"distance": distance}
 
-# Function to run the ultrasonic sensor and measure distance
+# Function to handle the distance sensor logic and retry mechanism
 def run_ultrasonic():
     global distance
     try:
+        print("Ultrasonic Measurement started...")
+        sleep(0.5)  # Allow the module to settle
+
         while True:
-            # Ensure the trigger pin is low
-            GPIO.output(TRIG, False)
-            sleep(0.1)
+            try:
+                # Measure the current distance (in cm)
+                measured_distance = sensor.distance * 100  # Convert to cm
 
-            # Generate a 10µs pulse to trigger the sensor
-            GPIO.output(TRIG, True)
-            sleep(0.00001)  # 10 microseconds
-            GPIO.output(TRIG, False)
+                if measured_distance > 400:  # Handle out-of-range readings
+                    print("Warning: Distance out of range or no object detected")
+                    measured_distance = 100.0  # Set to default 100 cm for invalid readings
 
-            # Measure the time between sending and receiving the pulse
-            while GPIO.input(ECHO) == 0:
-                pulse_start = time()
+                distance = round(measured_distance, 2)  # Round to 2 decimal places
+                print(f"Distance: {distance:.2f} cm")
+            except Exception as e:
+                print(f"Error reading distance: {e}")
+                distance = 0.0  # Reset to 0 if reading fails
 
-            while GPIO.input(ECHO) == 1:
-                pulse_end = time()
-
-            pulse_duration = pulse_end - pulse_start
-
-            # Calculate distance (speed of sound is 34300 cm/s)
-            distance = pulse_duration * 17150
-            distance = round(distance, 2)
-
-            print(f"Distance: {distance} cm")
-            sleep(1)
+            sleep(1)  # Adjust delay based on your needs
 
     except KeyboardInterrupt:
-        print("Measurement stopped by User")
+        print("Ultrasonic sensor measurement stopped by user.")
 
     finally:
-        GPIO.cleanup()  # Clean up GP
+        sensor.close()  # Clean up the sensor
+        GPIO.cleanup()  # Reset GPIO settings
+        print("Sensor resources released.")
+
+# For standalone testing
+if __name__ == "__main__":
+    run_ultrasonic()

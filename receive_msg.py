@@ -37,7 +37,6 @@ def receive_message():
         with device_lock:
             if not device.is_open():
                 device.open()
-
         while True:
             # Wait for incoming data
             xbee_message = device.read_data()

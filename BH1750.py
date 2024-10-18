@@ -52,3 +52,7 @@ def run_bh1750():
         print(f"Error initializing or reading BH1750: {e}")
     finally:
         bus.write_byte(BH1750_ADDRESS, 0x00)  # Power off the sensor
+
+# For standalone testing
+if __name__ == "__main__":
+    run_bh1750()
